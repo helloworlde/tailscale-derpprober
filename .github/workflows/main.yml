@@ -13,10 +13,12 @@ jobs:
       - name: Checkout repository and submodules
         uses: actions/checkout@v2
         with:
-          submodules: true
-
-      - name: Checkout submodules
-        run: git submodule update --init --recursive --remote --force
+          submodules: recursive
+        
+      - name: Git Submodule Update
+        run: |
+          git pull --recurse-submodules
+          git submodule update --init --recursive --remote --force
 
       - name: Set up Docker image tag
         id: vars
