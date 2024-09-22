@@ -1,0 +1,24 @@
+services:
+  derpprobe:
+    image: ghcr.io/helloworlde/tailscale-derpprober:main
+    container_name: derpprobe
+    hostname: derpprobe
+    restart: unless-stopped
+    environment:
+      # 自定义 Derp 节点
+      #- DERP_MAP=file:///config/derpmap.json
+      # Tailscale 的节点获取
+      #- DERP_MAP=local
+      - TS_ALLOW_DEBUG_IP=192.168.2.4
+      - LISTEN=:8030
+      - SPREAD=true
+      - INTERVAL=60s
+      - MESH_INTERVAL=60s
+      - STUN_INTERVAL=60s
+      - TLS_INTERVAL=60s
+      - BW_INTERVAL=600s
+    ports:
+      - "8030:8030"
+    volumes:
+      - ./config:/config
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
