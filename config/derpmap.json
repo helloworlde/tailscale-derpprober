@@ -1,0 +1,21 @@
+{
+  "Regions": {
+    "900": {
+      "RegionID": 900,
+      "RegionCode": "homelab",
+      "RegionName": "HomeLab",
+      "Latitude": 22.3193,
+      "Longitude": 114.1694,
+      "Nodes": [
+        {
+          "Name": "HomeLab Server",
+          "RegionID": 900,
+          "HostName": "derp20b.tailscale.com",
+          "IPv4": "103.6.84.152",
+          "IPv6": "2403:2500:8000:1::ef6",
+          "CanPort80": true
+        }
+      ]
+    }
+  }
+}
