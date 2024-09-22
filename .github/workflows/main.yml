@@ -15,6 +15,9 @@ jobs:
         with:
           submodules: true
 
+      - name: Checkout submodules
+        run: git submodule update --init --recursive --remote --force
+
       - name: Set up Docker image tag
         id: vars
         run: echo "IMAGE_TAG=ghcr.io/${{ github.repository }}:latest" >> $GITHUB_ENV
