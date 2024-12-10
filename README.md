@@ -129,7 +129,43 @@ services:
 
 ## 使用 Prometheus 抓取指标
 
-derpprobe 支持 Prometheus 格式的指标，但是仅允许 debug 或者本地部署时使用，通过容器部署后不能直接访问；可以通过指定环境变量的方式实现；key 是 `TS_ALLOW_DEBUG_IP`, 值是 Prometheus 的地址
+derpprobe 支持 Prometheus 格式的指标，但是仅允许 debug 或者本地部署时使用，通过容器部署后不能直接访问；可以通过指定环境变量的方式实现
+
+![homelab-tailscale-derp-probe-grafana-pannel.png](https://img.hellowood.dev/picture/homelab-tailscale-derp-probe-grafana-pannel.png)
+
+### 通过 debug.key 
+
+支持通过在请求中指定 debug.key 的值进行验证，环境变量 key 是 `TS_DEBUG_KEY_PATH`，文件内容是请求需要携带的参数 `debugkey` 的值
+
+- config/debug.key
+
+```
+debugvalue
+```
+
+- docker-compose.yaml
+
+```yaml
+services:
+  derpprobe:
+    image: ghcr.io/helloworlde/tailscale-derpprober:main
+    container_name: derpprobe
+    hostname: derpprobe
+    restart: unless-stopped
+    environment:
+      - TS_DEBUG_KEY_PATH=/config/debug.key
+    ports:
+      - "8030:8030"
+    volumes:
+      - ./config:/config
+```
+
+
+这样就可以通过 [http://192.168.65.2:8030/debug/varz?debugkey=debugvalue](http://192.168.65.2:8030/debug/varz?debugkey=debugvalue) 路径获取 Prometheus 指标了，之后可以通过 Grafana 进行监控
+
+### 通过指定特定 IP
+
+指定后仅允许该 IP 访问 debug 接口，环境变量 key 是 `TS_ALLOW_DEBUG_IP`, 值配置为 Prometheus 的地址
 
 - docker-compose.yaml
 
@@ -146,6 +182,4 @@ services:
       - "8030:8030"
 ```
 
-这样就可以通过 [http://192.168.65.2:8030/debug/varz](http://192.168.65.2:8030/debug/varz) 路径获取 Prometheus 指标了，之后可以通过 Grafana 进行监控
-
-![homelab-tailscale-derp-probe-grafana-pannel.png](https://img.hellowood.dev/picture/homelab-tailscale-derp-probe-grafana-pannel.png)
+从 192.168.65.3 访问 [http://192.168.65.2:8030/debug/varz](http://192.168.65.2:8030/debug/varz) 即可获取到相关指标

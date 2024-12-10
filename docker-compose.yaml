@@ -17,6 +17,7 @@ services:
       - STUN_INTERVAL=60s
       - TLS_INTERVAL=60s
       - BW_INTERVAL=600s
+      # - TS_DEBUG_KEY_PATH=/config/debug.key
     ports:
       - "8030:8030"
     volumes:
