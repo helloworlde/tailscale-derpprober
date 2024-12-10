@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS build-env
+FROM golang:alpine AS build-env
 
 WORKDIR /go/src/tailscale
 
@@ -8,7 +8,7 @@ RUN go mod download
 COPY tailscale .
 
 ARG TARGETARCH
-RUN GOARCH=$TARGETARCH go build -o  derpprobe cmd/derpprobe/derpprobe.go
+RUN cd /go/src/tailscale/cmd/derpprobe/ && GOARCH=$TARGETARCH CGO_ENABLED=0 go build -ldflags "-s -w" -o /derpprobe
 
 FROM alpine:3.18
 RUN apk add --no-cache ca-certificates
@@ -24,9 +24,9 @@ ENV TLS_INTERVAL=15s
 ENV BW_INTERVAL=0
 ENV BW_PROBE_SIZE_BYTES=1_000_000
 
-COPY --from=build-env /go/src/tailscale/derpprobe /usr/local/bin/derpprobe
+COPY --from=build-env /derpprobe /app/derpprobe
 
-ENTRYPOINT ["sh", "-c", "/usr/local/bin/derpprobe \
+ENTRYPOINT ["sh", "-c", "/app/derpprobe \
     -derp-map=${DERP_MAP} \
     -listen=${LISTEN} \
     -once=${ONCE} \
