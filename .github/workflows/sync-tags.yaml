@@ -12,6 +12,10 @@ jobs:
       contents: write  # 需要写入权限来创建提交和标签
       pull-requests: write  # 如果需要创建 PR，则需要此权限
 
+    outputs:
+      new_tag_created: ${{ steps.check-tags.outputs.new_tag }}
+      tag_version: ${{ steps.check-tags.outputs.tag_version }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -30,7 +34,7 @@ jobs:
           # 获取 submodule 最新的 tag
           cd tailscale
           git fetch --tags origin
-          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
           cd ..
 
           # 检查当前仓库是否已经有这个 tag
@@ -53,26 +57,9 @@ jobs:
           git tag ${{ steps.check-tags.outputs.tag_version }}
           git push origin main --tags
 
-      # 或者创建 PR 的版本
-      # - name: Create Pull Request
-      #   if: steps.check-tags.outputs.new_tag == 'true'
-      #   run: |
-      #     # 创建新分支
-      #     git checkout -b update-tailscale-${{ steps.check-tags.outputs.tag_version }}
-      #     
-      #     # 更新 submodule
-      #     cd tailscale
-      #     git checkout ${{ steps.check-tags.outputs.tag_version }}
-      #     cd ..
-      #     
-      #     # 提交更改
-      #     git add tailscale
-      #     git commit -m "chore: update tailscale submodule to ${{ steps.check-tags.outputs.tag_version }}"
-      #     git push origin update-tailscale-${{ steps.check-tags.outputs.tag_version }}
-      #     
-      #     # 创建 Pull Request
-      #     gh pr create \
-      #       --title "Update Tailscale to ${{ steps.check-tags.outputs.tag_version }}" \
-      #       --body "Automated PR to update Tailscale submodule to version ${{ steps.check-tags.outputs.tag_version }}" \
-      #       --base main \
-      #       --head update-tailscale-${{ steps.check-tags.outputs.tag_version }}
+  trigger-build:
+    needs: update-submodule
+    if: needs.update-submodule.outputs.new_tag_created == 'true'
+    uses: ./.github/workflows/build-docker.yml
+    with:
+      tag_version: ${{ needs.update-submodule.outputs.tag_version }}
