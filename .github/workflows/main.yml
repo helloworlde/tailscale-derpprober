@@ -1,40 +1,74 @@
-name: Build Docker Image
+name: Update Tailscale and Build Docker Image
 
 on:
+  schedule:
+    - cron: '0 0 * * *'  # UTC 时间每天零点
+  workflow_dispatch:
   push:
     branches:
-      - '**'
-    tags:
-      - '*'
-  workflow_dispatch:
-  workflow_call:
-    inputs:
-      tag_version:
-        description: 'Tag version to build'
-        required: false
-        type: string
+      - 'main'  # 保留对主分支推送的响应
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  update-and-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write  # 需要写入权限来创建提交和标签
+      packages: write  # 需要写入权限来推送Docker镜像
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: true
-          ref: ${{ inputs.tag_version || github.ref }}
+          fetch-depth: 0
 
+      - name: Git config
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Check for new Tailscale tags
+        id: check-tags
+        run: |
+          # 获取 submodule 最新的 tag
+          cd tailscale
+          git fetch --tags origin
+          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+          cd ..
+
+          # 检查当前仓库是否已经有这个 tag
+          if git rev-parse "$LATEST_TAG" >/dev/null 2>&1; then
+            echo "Tag $LATEST_TAG already exists in current repository"
+            echo "new_tag=false" >> $GITHUB_OUTPUT
+          else
+            echo "Found new tag: $LATEST_TAG"
+            echo "new_tag=true" >> $GITHUB_OUTPUT
+            echo "tag_version=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update submodule and push tag
+        if: steps.check-tags.outputs.new_tag == 'true'
+        run: |
+          cd tailscale
+          git checkout ${{ steps.check-tags.outputs.tag_version }}
+          cd ..
+          git add tailscale
+          git commit -m "chore: update tailscale submodule to ${{ steps.check-tags.outputs.tag_version }}"
+          git tag ${{ steps.check-tags.outputs.tag_version }}
+          git push origin main --tags
+          echo "Updated submodule and pushed tag ${{ steps.check-tags.outputs.tag_version }}"
+
+      # 只在有新tag或手动触发时构建Docker镜像
       - name: Set up Docker Buildx
+        if: steps.check-tags.outputs.new_tag == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         uses: docker/setup-buildx-action@v2
 
       - name: Log in to the Container registry
+        if: steps.check-tags.outputs.new_tag == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
           registry: ${{ env.REGISTRY }}
@@ -42,6 +76,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels) for Docker
+        if: steps.check-tags.outputs.new_tag == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
@@ -55,6 +90,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
       - name: Build and push Docker image
+        if: steps.check-tags.outputs.new_tag == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         id: push
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
@@ -63,7 +99,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-          # 使用本地缓存替代 registry 缓存
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
